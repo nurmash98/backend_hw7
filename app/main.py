@@ -74,10 +74,10 @@ def post_flowers(flower: FlowerRequest, token: Annotated[str, Depends(oauth2_sch
 @app.get("/cart/items")
 def get_cart_items(response: Response, cart: str = Cookie(default = "[]")):
     cart_json = json.loads(cart)
-    flowers = flowers_repo.get_flowers_by_cart(cart_json)
+    flowers, sum = flowers_repo.get_flowers_by_cart(cart_json)
     if not flowers:
         return Response("Not Valid Cart")
-    return flowers
+    return {"flowers" : flowers, "sum" : sum}
 
 @app.post("/cart/items")
 def post_cart_item(response: Response, flower_id: int = Form(), cart: str = Cookie(default = "[]")):
@@ -90,6 +90,35 @@ def post_cart_item(response: Response, flower_id: int = Form(), cart: str = Cook
     new_cart = json.dumps(cart_json)
     response.set_cookie(key = "cart", value = new_cart)
     return response
+
+@app.get("/purchased")
+def get_purchased(token: Annotated[str, Depends(oauth2_schema)]):
+    username = decode_jwt(token)
+    user = users_repo.get_by_username(username)
+    user_id = user.id
+    flowers_id = purchases_repo.get_flowers_id(user_id)
+    resp = []
+    for flower_id in flowers_id:
+        flower = flowers_repo.get_flower_by_id(flower_id)
+        resp.append({"Flower name" : flower.name, "Sum" : flower.cost*flower.count}) 
+    return resp
+
+        
+
+
+
+@app.post("/purchased")
+def post_purchase(token: Annotated[str, Depends(oauth2_schema)], cart: str = Cookie(default = "[]")):
+    carts = json.loads(cart)
+    username = decode_jwt(token)
+    user = users_repo.get_by_username(username)
+    user_id = user.id
+    for cart in carts:
+        purchases_repo.save(Purchase(user_id = user_id, flower_id = int(cart)))
+
+    return Response("Added to purchase")
+
+
 
 
 
